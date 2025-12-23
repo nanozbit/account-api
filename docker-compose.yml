@@ -1,0 +1,97 @@
+
+services:
+  # MySQL Database for DEV environment
+  mysql-dev:
+    image: mysql:8.0
+    container_name: mysql-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: app_dev
+      MYSQL_USER: devuser
+      MYSQL_PASSWORD: devpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+      - ./init-db/dev:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # MySQL Database for PROD environment
+  mysql-prod:
+    image: mysql:8.0
+    container_name: mysql-prod
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: app_prod
+      MYSQL_USER: produser
+      MYSQL_PASSWORD: prodpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-prod-data:/var/lib/mysql
+      - ./init-db/prod:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend Application - DEV
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-dev
+    environment:
+      APP_ENV: dev
+      PORT: 8080
+      DB_HOST: mysql-dev
+      DB_PORT: 3306
+      DB_NAME: app_dev
+      DB_USER: devuser
+      DB_PASSWORD: devpassword
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql-dev:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Backend Application - PROD
+  app-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-prod
+    environment:
+      APP_ENV: prod
+      PORT: 8080
+      DB_HOST: mysql-prod
+      DB_PORT: 3306
+      DB_NAME: app_prod
+      DB_USER: produser
+      DB_PASSWORD: prodpassword
+    ports:
+      - "8081:8080"
+    depends_on:
+      mysql-prod:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql-dev-data:
+  mysql-prod-data:
